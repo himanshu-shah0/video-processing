@@ -3,6 +3,25 @@ from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from moviepy import VideoFileClip
 from moviepy.video.fx import Crop
 
+# from moviepy.tools import subprocess_call
+# from moviepy.config import get_setting
+
+
+# def ffmpeg_extract_subclip(filename, t1, t2, targetname=None):
+#     """ Makes a new video file playing video file ``filename`` between
+#     the times ``t1`` and ``t2``. """
+#     name, ext = os.path.splitext(filename)
+#     if not targetname:
+#         T1, T2 = [int(1000*t) for t in [t1, t2]]
+#         targetname = "%sSUB%d_%d.%s" % (name, T1, T2, ext)
+
+#     cmd = [get_setting("FFMPEG_BINARY"),"-y",
+#            "-ss", "%0.2f"%t1,
+#            "-i", filename,
+#            "-t", "%0.2f"%(t2-t1),
+#            "-vcodec", "copy", "-acodec", "copy", targetname]
+
+#     subprocess_call(cmd)
 def read_timestamps(file_path):
     """Reads timestamps from a text file and returns a list of tuples."""
     print(f"📂 Reading timestamps from: {file_path}")
@@ -63,7 +82,7 @@ def extract_and_resize_clips(video_path, timestamps, output_folder):
 
         try:
             print(f"🔪 Extracting subclip: {start_sec}s to {end_sec}s")
-            ffmpeg_extract_subclip(video_path, start_sec, end_sec, temp_output_path)
+            ffmpeg_extract_subclip(video_path, start_sec, end_sec+4, temp_output_path)
             temp_file_size = os.path.getsize(temp_output_path)
             print(f"Temporary file size: {temp_file_size}")
 
@@ -132,9 +151,9 @@ def time_to_seconds_to_timestamp(seconds):
     return f"{minutes:02d}:{remaining_seconds:02d}"
 
 if __name__ == "__main__":
-    video_path = "video-processing/input_files/sample_video.mp4"  # Replace with your video path
-    timestamps_file = "video-processing/input_files/timestamps.txt" # Replace with your timestamps file path
-    output_folder = "video-processing/output_videos"
+    video_path = "input_files/sample_video.mp4"  # Replace with your video path
+    timestamps_file = "input_files/timestamps.txt" # Replace with your timestamps file path
+    output_folder = "output_videos"
 
     if not os.path.exists(video_path):
         print(f"❌ Video file not found: {video_path}")
@@ -142,6 +161,7 @@ if __name__ == "__main__":
         print(f"❌ Timestamps file not found: {timestamps_file}")
     else:
         video_duration = get_video_duration(video_path)
+        print("Found the file!!!")
         print(f"ℹ️ Video duration: {video_duration} seconds")
 
         timestamps = read_timestamps(timestamps_file)
