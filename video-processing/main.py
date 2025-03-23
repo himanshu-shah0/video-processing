@@ -1,27 +1,36 @@
 import os
-from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
+# from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from moviepy import VideoFileClip
 from moviepy.video.fx import Crop
 
-# from moviepy.tools import subprocess_call
-# from moviepy.config import get_setting
+# import subprocess
+
+# from moviepy.editor import VideoFileClip
+
+def extract_clip_moviepy(video_path, start_time, end_time, output_path):
+    """Extracts video clips using MoviePy's precise subclip method."""
+    try:
+        clip = VideoFileClip(video_path)
+        if clip.duration == 0:
+            raise ValueError("Video duration is 0. Check the file.")
+
+        # Ensure times are within the valid range
+        start_time = max(0, min(start_time, clip.duration))
+        end_time = max(0, min(end_time, clip.duration))
+
+        # Extract subclip
+        subclip = clip.subclipped(start_time, end_time)
+        subclip.write_videofile(output_path, codec="libx264", fps=clip.fps, audio_codec="aac")
+
+        # Cleanup
+        clip.close()
+        subclip.close()
+        print(f"✅ Saved clip: {output_path}")
+    except Exception as e:
+        print(f"❌ Error extracting clip: {e}")
 
 
-# def ffmpeg_extract_subclip(filename, t1, t2, targetname=None):
-#     """ Makes a new video file playing video file ``filename`` between
-#     the times ``t1`` and ``t2``. """
-#     name, ext = os.path.splitext(filename)
-#     if not targetname:
-#         T1, T2 = [int(1000*t) for t in [t1, t2]]
-#         targetname = "%sSUB%d_%d.%s" % (name, T1, T2, ext)
 
-#     cmd = [get_setting("FFMPEG_BINARY"),"-y",
-#            "-ss", "%0.2f"%t1,
-#            "-i", filename,
-#            "-t", "%0.2f"%(t2-t1),
-#            "-vcodec", "copy", "-acodec", "copy", targetname]
-
-#     subprocess_call(cmd)
 def read_timestamps(file_path):
     """Reads timestamps from a text file and returns a list of tuples."""
     print(f"📂 Reading timestamps from: {file_path}")
@@ -82,7 +91,8 @@ def extract_and_resize_clips(video_path, timestamps, output_folder):
 
         try:
             print(f"🔪 Extracting subclip: {start_sec}s to {end_sec}s")
-            ffmpeg_extract_subclip(video_path, start_sec, end_sec+4, temp_output_path)
+            # ffmpeg_extract_subclip(video_path, start_sec, end_sec, temp_output_path)
+            extract_clip_moviepy(video_path, start_sec, end_sec, temp_output_path)
             temp_file_size = os.path.getsize(temp_output_path)
             print(f"Temporary file size: {temp_file_size}")
 
