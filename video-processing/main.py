@@ -1,11 +1,7 @@
 import os
-# from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from moviepy import VideoFileClip
 from moviepy.video.fx import Crop
-
-# import subprocess
-
-# from moviepy.editor import VideoFileClip
+import whisper
 
 def extract_clip_moviepy(video_path, start_time, end_time, output_path):
     """Extracts video clips using MoviePy's precise subclip method."""
@@ -28,8 +24,6 @@ def extract_clip_moviepy(video_path, start_time, end_time, output_path):
         print(f"✅ Saved clip: {output_path}")
     except Exception as e:
         print(f"❌ Error extracting clip: {e}")
-
-
 
 def read_timestamps(file_path):
     """Reads timestamps from a text file and returns a list of tuples."""
@@ -77,6 +71,8 @@ def extract_and_resize_clips(video_path, timestamps, output_folder):
         os.makedirs(output_folder)
         print(f"📁 Created output directory: {output_folder}")
 
+    clip_paths = []
+
     for idx, (start, end) in enumerate(timestamps):
         print(f"🎬 Processing clip {idx + 1}: {start} to {end}")
 
@@ -91,13 +87,12 @@ def extract_and_resize_clips(video_path, timestamps, output_folder):
 
         try:
             print(f"🔪 Extracting subclip: {start_sec}s to {end_sec}s")
-            # ffmpeg_extract_subclip(video_path, start_sec, end_sec, temp_output_path)
             extract_clip_moviepy(video_path, start_sec, end_sec, temp_output_path)
             temp_file_size = os.path.getsize(temp_output_path)
             print(f"Temporary file size: {temp_file_size}")
 
             if temp_file_size == 0:
-                print(f"❌ ERROR: Extracted temp clip is empty. FFmpeg extraction failed.")
+                print(f"❌ ERROR: Extracted temp clip is empty. MoviePy extraction failed.")
                 continue
 
             temp_clip_test = VideoFileClip(temp_output_path)
@@ -130,6 +125,7 @@ def extract_and_resize_clips(video_path, timestamps, output_folder):
             final_output_path = os.path.join(output_folder, f"clip_{idx + 1}.mp4")
             clip.write_videofile(final_output_path, codec="libx264", fps=fps, audio_codec="aac")
             print(f"✅ Saved clip {idx + 1} at {final_output_path}")
+            clip_paths.append(final_output_path)
 
         except Exception as e:
             print(f"❌ Error saving clip {idx + 1}: {e}")
@@ -142,6 +138,7 @@ def extract_and_resize_clips(video_path, timestamps, output_folder):
             print(f"🗑 Deleted temporary file: {temp_output_path}")
         except Exception as e:
             print(f"⚠ Error deleting temp file: {e}")
+    return clip_paths
 
 def get_video_duration(video_path):
     """Gets the duration of a video file in seconds."""
@@ -160,10 +157,42 @@ def time_to_seconds_to_timestamp(seconds):
     remaining_seconds = int(seconds % 60)
     return f"{minutes:02d}:{remaining_seconds:02d}"
 
+def generate_subtitles(clip_paths, output_folder):
+    """Extracts audio from clips and generates subtitles."""
+    model = whisper.load_model("base") 
+
+    for clip_path in clip_paths:
+        try:
+            video_clip = VideoFileClip(clip_path)
+            audio_path = os.path.join(output_folder, f"{os.path.splitext(os.path.basename(clip_path))[0]}.wav")
+            video_clip.audio.write_audiofile(audio_path)
+            video_clip.close()
+
+            result = model.transcribe(audio_path)
+            segments = result["segments"]
+
+            srt_path = os.path.join(output_folder, f"{os.path.splitext(os.path.basename(clip_path))[0]}.srt")
+            with open(srt_path, "w", encoding="utf-8") as srt_file:
+                for segment in segments:
+                    start = segment["start"]
+                    end = segment["end"]
+                    text = segment["text"].strip()
+                    start_ms = int(start * 1000)
+                    end_ms = int(end * 1000)
+                    start_str = f"{start_ms // 3600000:02d}:{(start_ms % 3600000) // 60000:02d}:{(start_ms % 60000) // 1000:02d},{start_ms % 1000:03d}"
+                    end_str = f"{end_ms // 3600000:02d}:{(end_ms % 36000000) // 60000:02d}:{(end_ms % 60000) // 1000:02d},{end_ms % 1000:03d}"
+                    srt_file.write(f"{segment['id'] + 1}\n{start_str} --> {end_str}\n{text}\n\n")
+
+            print(f"✅ Subtitles generated for {clip_path} at {srt_path}")
+            os.remove(audio_path)
+
+        except Exception as e:
+            print(f"❌ Error generating subtitles for {clip_path}: {e}")
+
 if __name__ == "__main__":
-    video_path = "input_files/sample_video.mp4"  # Replace with your video path
-    timestamps_file = "input_files/timestamps.txt" # Replace with your timestamps file path
-    output_folder = "output_videos"
+    video_path = "video-processing/input_files/sample_video.mp4" 
+    timestamps_file = "video-processing/input_files/timestamps.txt"  
+    output_folder = "video-processing/output_videos"
 
     if not os.path.exists(video_path):
         print(f"❌ Video file not found: {video_path}")
@@ -191,5 +220,6 @@ if __name__ == "__main__":
             else:
                 adjusted_timestamps.append((start, end))
 
-        extract_and_resize_clips(video_path, adjusted_timestamps, output_folder)
-        print("✅ Video processing complete! Clips saved in 'output_videos' folder.")
+        clip_paths = extract_and_resize_clips(video_path, adjusted_timestamps, output_folder)
+        generate_subtitles(clip_paths, output_folder)
+        print("✅ Video processing complete! Clips and subtitles saved in 'output_videos' folder.")
